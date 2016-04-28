@@ -1,6 +1,8 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8)
 
 project (gridlda)
+
+add_subdirectory(gflags)
 
 # set compiling flags
 set (CMAKE_CXX_FLAGS "-march=native -std=c++1y -Wall -g ${CMAKE_CXX_FLAGS}")
@@ -12,7 +14,6 @@ if(OPENMP_FOUND)
 	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-find_package(gflags REQUIRED)
 
 # set include dircetories
 include_directories (./src)
