@@ -1,4 +1,4 @@
-#include "Bigraph.h"
+#include "Bigraph.hpp"
 
 #include <algorithm>
 #include <fstream>

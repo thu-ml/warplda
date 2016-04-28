@@ -1,5 +1,5 @@
-#include "AdjList.h"
-#include "Utils.h"
+#include "AdjList.hpp"
+#include "Utils.hpp"
 
 #include <fstream>
 #include <iostream>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AdjList.h"
+#include "AdjList.hpp"
 
 class Bigraph
 {

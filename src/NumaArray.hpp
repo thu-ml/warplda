@@ -1,9 +1,9 @@
 #pragma once
-#include "Partition.h"
+#include "Partition.hpp"
 #include "omp.h"
 #include <numa.h>
 #include <map>
-#include "Types.h"
+#include "Types.hpp"
 
 template <class T>
 class RemoteArray
@@ -17,7 +17,7 @@ class RemoteArray
 		const T& operator[](size_t pos) const { return arr_[idx_[pos]]; }
 	private:
 		T* arr_;
-		const TIdx* idx_;	
+		const TIdx* idx_;
 };
 
 
@@ -33,7 +33,7 @@ class RemoteArray64
 		const T& operator[](size_t pos) const { return arr_[idx_[pos]]; }
 	private:
 		T* arr_;
-		TIdx* idx_;	
+		TIdx* idx_;
 };
 
 
@@ -42,7 +42,7 @@ class NumaInfo
 	public:
 		static void Init()
 		{
-#pragma omp parallel 
+#pragma omp parallel
 			{
 				int tid = omp_get_thread_num();
 				int nid = numa_node_of_cpu(tid);
@@ -103,7 +103,7 @@ class NumaArray
 };
 
 
-#if 0 
+#if 0
 template <class T>
 class NumaArray1
 {

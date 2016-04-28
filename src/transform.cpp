@@ -2,9 +2,9 @@
 
 #include <gflags/gflags.h>
 
-#include "Bigraph.h"
-#include "Vocab.h"
-#include "Utils.h"
+#include "Bigraph.hpp"
+#include "Vocab.hpp"
+#include "Utils.hpp"
 #include <exception>
 
 DEFINE_string(prefix, "./prefix", "prefix of temporary files");

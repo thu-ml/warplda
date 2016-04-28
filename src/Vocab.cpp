@@ -1,5 +1,5 @@
-#include "Vocab.h"
-#include "Utils.h"
+#include "Vocab.hpp"
+#include "Utils.hpp"
 
 #include <fstream>
 #include <sstream>

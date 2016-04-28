@@ -1,7 +1,7 @@
 #define STRIP_FLAG_HELP 0
 #include <gflags/gflags.h>
-#include "Bigraph.h"
-#include "Utils.h"
+#include "Bigraph.hpp"
+#include "Utils.hpp"
 
 DEFINE_string(prefix, "./prefix", "prefix of temporary files");
 DEFINE_int32(niter, 10, "Num of iteration");

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Types.h"
+#include "Types.hpp"
 //#include "Partition.h"
-#include "NumaArray.h"
+#include "NumaArray.hpp"
 
 template <class TSrc_, class TDst_, class TEdge_, class TDegree_>
 class AdjList

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lda.h"
+#include "lda.hpp"
 
 class WarpLDA : public LDA
 {
