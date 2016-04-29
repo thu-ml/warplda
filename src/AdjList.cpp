@@ -23,10 +23,10 @@ bool AdjList<TSrc, TDst, TEdge, TDegree>::Load(std::string name)
 		return false;
 	n_ = filesize(fidx) / sizeof(TEdge) - 1;
 
-	p_ = Partition(1, n_);
+//	p_ = Partition(1, n_);
 
-	beg_ = p_.Startid(0);
-	end_ = p_.Startid(1);
+	beg_ = 0; //p_.Startid(0);
+	end_ = n_; //p_.Startid(1);
 	n_local_ = end_ - beg_;
 
 	readvec(idx_vec_, fidx, beg_ , end_ - beg_ + 1);

@@ -12,7 +12,7 @@ popd
 {
 mkdir -p debug
 pushd debug
-#cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_BUILD_TYPE=Debug
 popd
 }
 

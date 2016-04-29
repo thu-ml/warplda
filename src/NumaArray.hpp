@@ -40,32 +40,36 @@ class RemoteArray64
 class NumaInfo
 {
 	public:
-		static void Init()
+		struct info_t
 		{
-#pragma omp parallel
+			std::map<int, std::map<int, int>> info;
+			std::map<int, int> ord;
+			std::map<int, int> numa_id;
+			info_t()
 			{
-				int tid = omp_get_thread_num();
-				int nid = numa_node_of_cpu(tid);
-#pragma omp critical
+				#pragma omp parallel
 				{
-					numa_id[tid] = nid;
-					ord[tid] = info[nid].size();
-					info[nid][tid] = info[nid].size();
-//					printf("NumaInfo::Init thread id %d at numa %d ord = %d\n", tid, nid, info[nid][tid]);
+					int tid = omp_get_thread_num();
+					int nid = numa_node_of_cpu(tid);
+					#pragma omp critical
+					{
+						numa_id[tid] = nid;
+						ord[tid] = info[nid].size();
+						info[nid][tid] = info[nid].size();
+						//					printf("NumaInfo::Init thread id %d at numa %d ord = %d\n", tid, nid, info[nid][tid]);
+					}
 				}
 			}
-		}
+		};
+		static info_t info;
 		NumaInfo(int thread_id, size_t n)
 		{
-			Partition p(info.size(), n);
-			beg = p.Startid(numa_id[thread_id])+ord[thread_id];
-			end = p.Startid(numa_id[thread_id]+1);
-			step = info[numa_id[thread_id]].size();
+			Partition p(info.info.size(), n);
+			beg = p.Startid(info.numa_id[thread_id])+info.ord[thread_id];
+			end = p.Startid(info.numa_id[thread_id]+1);
+			step = info.info[info.numa_id[thread_id]].size();
 		}
-		static std::map<int, std::map<int, int>> info;
-		static std::map<int, int> ord;
-		static std::map<int, int> numa_id;
-		int beg, end, step;
+		size_t beg, end, step;
 };
 
 template <class T>

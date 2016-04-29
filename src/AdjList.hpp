@@ -37,7 +37,7 @@ class AdjList
 		TEdge * idx_;
 		TDst * lnk_;
 	private:
-		Partition p_;
+		//Partition p_;
 		TSrc n_;
 		TSrc n_local_;
 		TEdge ne_;

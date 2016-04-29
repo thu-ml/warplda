@@ -1,14 +1,20 @@
 #pragma once
 
+#include <string>
+#include "Bigraph.hpp"
+
 class LDA
 {
+protected:
+    Bigraph g;
 public:
-    virtual void load(std::string prefix) = 0;
-    virtual void estimate(int K, float alpha, float beta);
-    virtual void inference(int K, float alpha, float beta);
-    virtual void loadModel(std::string prefix);
-    virtual void storeModel(std::string prefix) const;
-    virtual void loadZ(std::string prefix);
-    virtual void storeZ(std::string prefix);
-    virtual void writeInfo(std::string prefix);
+    LDA() {}
+    virtual void loadBinary(std::string prefix);
+    virtual void estimate(int K, float alpha, float beta, int niter) = 0;
+    virtual void inference(int K, float alpha, float beta, int niter) = 0;
+    virtual void loadModel(std::string prefix) = 0;
+    virtual void storeModel(std::string prefix) const = 0;
+    virtual void loadZ(std::string prefix) = 0;
+    virtual void storeZ(std::string prefix) = 0;
+    virtual void writeInfo(std::string vocab, std::string info) = 0;
 };

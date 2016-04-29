@@ -9,6 +9,14 @@
 //#include <gzstream.h>
 #include <unistd.h>
 
+inline uint32_t logceil(uint32_t n)
+{
+	for (uint32_t i = 0; i < 31; i++)
+		if ((1U << i) >= n)
+			return i;
+	return -1;
+}
+
 inline unsigned int Divup(unsigned int a, unsigned int b)
 {
 	return (a + b - 1) / b;

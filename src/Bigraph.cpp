@@ -8,9 +8,8 @@ Bigraph::Bigraph()
 {
 }
 
-bool Bigraph::Load(const char *fname)
+bool Bigraph::Load(std::string name)
 {
-	std::string name(fname);
 	if (u.Load(name + ".u") && v.Load(name + ".v"))
 	{
 		std::ifstream fwordid(name + ".wordid", std::ios::binary);

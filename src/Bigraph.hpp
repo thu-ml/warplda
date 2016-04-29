@@ -14,7 +14,7 @@ class Bigraph
 		std::vector<TVID> word_id;
 	public:
 		Bigraph();
-		bool Load(const char*);
+		bool Load(std::string);
 		TUID NU() { return u.NumVertices(); }
 		TVID NV() { return v.NumVertices(); }
 		TEID NE() { return u.NumEdges(); }

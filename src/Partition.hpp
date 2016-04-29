@@ -3,7 +3,7 @@
 class Partition
 {
 	public:
-		Partition(){}
+		//Partition(){}
 		Partition(int size, int n)
 			: size_(size)
 			, n_(n)

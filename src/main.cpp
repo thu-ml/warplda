@@ -2,6 +2,7 @@
 #include <gflags/gflags.h>
 #include "Bigraph.hpp"
 #include "Utils.hpp"
+#include "warplda.hpp"
 
 DEFINE_string(prefix, "./prefix", "prefix of temporary files");
 DEFINE_int32(niter, 10, "Num of iteration");
@@ -27,5 +28,16 @@ int main(int argc, char** argv)
     SetIfEmpty(FLAGS_info, FLAGS_prefix + ".info");
     SetIfEmpty(FLAGS_vocab, FLAGS_prefix + ".vocab");
 
+    LDA *lda = new WarpLDA<1>();
+    lda->loadBinary(FLAGS_bin);
+    if (FLAGS_estimate)
+        lda->estimate(FLAGS_k, FLAGS_alpha, FLAGS_beta, FLAGS_niter);
+    else if(FLAGS_inference)
+    {
+        lda->loadModel(FLAGS_model);
+        lda->inference(FLAGS_k, FLAGS_alpha, FLAGS_beta, FLAGS_niter);
+    }
+    if (FLAGS_writeinfo)
+        lda->writeInfo(FLAGS_vocab, FLAGS_info);
 	return 0;
 }
