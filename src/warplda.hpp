@@ -35,7 +35,7 @@ private:
     NumaArray<TCount> nnz_d;
     NumaArray<TCount> nnz_w;
     NumaArray<TCount> ck;
-    NumaArray<TCount> ck_new;
+//    NumaArray<TCount> ck_new;
     std::unique_ptr<Shuffle<TData>> shuffle;
     XorShift generator;
     double total_jll;

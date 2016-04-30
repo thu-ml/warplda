@@ -31,11 +31,11 @@ int main(int argc, char** argv)
     LDA *lda = new WarpLDA<1>();
     lda->loadBinary(FLAGS_bin);
     if (FLAGS_estimate)
-        lda->estimate(FLAGS_k, FLAGS_alpha, FLAGS_beta, FLAGS_niter);
+        lda->estimate(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter);
     else if(FLAGS_inference)
     {
         lda->loadModel(FLAGS_model);
-        lda->inference(FLAGS_k, FLAGS_alpha, FLAGS_beta, FLAGS_niter);
+        lda->inference(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter);
     }
     if (FLAGS_writeinfo)
         lda->writeInfo(FLAGS_vocab, FLAGS_info);

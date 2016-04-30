@@ -19,7 +19,6 @@ void WarpLDA<MH>::initialize()
 	beta_bar = beta * g.NV();
 
 	ck.Assign(K, 0);
-	ck_new.Assign(K, 0);
 
 	nnz_d.Assign(g.NU());
 	nnz_w.Assign(g.NV());
@@ -214,22 +213,22 @@ void WarpLDA<MH>::accept_w_propose_d()
 	shuffle->VisitURemoteData([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
     {
 		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
-		TCount* ck_new = local_buffers[omp_get_thread_num()]->ck_new.data();
-		TData * local_data = local_buffer->local_data.data();
+        TCount* ck_new = local_buffers[omp_get_thread_num()]->ck_new.data();
+        TData * local_data = local_buffer->local_data.data();
 
-      auto& cxk = local_buffer->cxk_sparse;
-      cxk.Rebuild(logceil(std::min(K, nnz_d[d] * LOAD_FACTOR)));
+        auto& cxk = local_buffer->cxk_sparse;
+        cxk.Rebuild(logceil(std::min(K, nnz_d[d] * LOAD_FACTOR)));
 
-      for (TDegree i=0; i<N; i++) {
-        local_data[i] = data[i];
-        cxk.Put(data[i].oldk)++;
-      }
+        for (TDegree i=0; i<N; i++) {
+            local_data[i] = data[i];
+            cxk.Put(data[i].oldk)++;
+        }
 
-      // Perplexity
-	float lgammaalpha = lgamma(alpha);
+        // Perplexity
+        float lgammaalpha = lgamma(alpha);
         for (auto entry: cxk.table)
-          if (entry.key != cxk.EMPTY_KEY)
-            local_buffer->log_likelihood += lgamma(alpha+entry.value) - lgammaalpha;
+        if (entry.key != cxk.EMPTY_KEY)
+        local_buffer->log_likelihood += lgamma(alpha+entry.value) - lgammaalpha;
 
         local_buffer->log_likelihood -= lgamma(alpha_bar+N) - lgamma(alpha_bar);
 
@@ -239,33 +238,33 @@ void WarpLDA<MH>::accept_w_propose_d()
             local_buffer->total_jll += log(theta);
         }
 
-      for (TDegree i = 0; i < N; i++)
-      {
-	      TTopic oldk = local_data[i].oldk;
-	      TTopic originalk = local_data[i].oldk;
-	      float b = cxk.Get(oldk)+alpha-1;
-	      float d = ck[oldk]+beta_bar-1;
-	      //#pragma simd
-	      for (unsigned mh=0; mh<MH; mh++)
-	      {
-		      TTopic newk = local_data[i].newk[mh];
-		      float a = cxk.Get(newk)+alpha-(newk==originalk);
-		      float c = ck[newk]+beta_bar-(newk==originalk);
-		      float ad = a*d;
-		      float bc = b*c;
-		      bool accept = local_buffer->Rand32() *bc < ad * std::numeric_limits<uint32_t>::max();
-		      if (accept) {
-			      oldk = newk;
-			      b = a; d = c;
-		      }
-	      }
-          ck_new[oldk]++;
-          local_data[i].oldk = oldk;
-      }
-      nnz_d[d] = cxk.NKey();
+        for (TDegree i = 0; i < N; i++)
+        {
+            TTopic oldk = local_data[i].oldk;
+            TTopic originalk = local_data[i].oldk;
+            float b = cxk.Get(oldk)+alpha-1;
+            float d = ck[oldk]+beta_bar-1;
+            //#pragma simd
+            for (unsigned mh=0; mh<MH; mh++)
+            {
+                TTopic newk = local_data[i].newk[mh];
+                float a = cxk.Get(newk)+alpha-(newk==originalk);
+                float c = ck[newk]+beta_bar-(newk==originalk);
+                float ad = a*d;
+                float bc = b*c;
+                bool accept = local_buffer->Rand32() *bc < ad * std::numeric_limits<uint32_t>::max();
+                if (accept) {
+                    oldk = newk;
+                    b = a; d = c;
+                }
+            }
+            ck_new[oldk]++;
+            local_data[i].oldk = oldk;
+        }
+        nnz_d[d] = cxk.NKey();
 
-		double new_topic = alpha_bar / (alpha_bar + N);
-		uint32_t new_topic_th = std::numeric_limits<uint32_t>::max() * new_topic;
+        double new_topic = alpha_bar / (alpha_bar + N);
+        uint32_t new_topic_th = std::numeric_limits<uint32_t>::max() * new_topic;
         for (TDegree i = 0; i < N; i++)
         {
             data[i].oldk = local_data[i].oldk;
@@ -276,7 +275,7 @@ void WarpLDA<MH>::accept_w_propose_d()
                 data[i].newk[mh] = r < new_topic_th ? rk : local_data[rn].oldk;
             }
         }
-  });
+    });
 #pragma omp parallel for
 	for (TTopic i = 0; i < K; i++)
 	{
