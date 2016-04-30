@@ -34,8 +34,8 @@ private:
     int niter;
     NumaArray<TCount> nnz_d;
     NumaArray<TCount> nnz_w;
-    std::vector<TCount> ck;
-    std::vector<TCount> ck_new;
+    NumaArray<TCount> ck;
+    NumaArray<TCount> ck_new;
     std::unique_ptr<Shuffle<TData>> shuffle;
     XorShift generator;
     double total_jll;
@@ -45,19 +45,14 @@ private:
     void accept_d_propose_w();
     void accept_w_propose_d();
     struct LocalBuffer{
-        uint32_t r[MH], rn[MH], rk[MH];
-        TTopic sparse_dense_th;
+        //uint32_t r[MH], rn[MH], rk[MH];
         std::vector<TCount> ck_new;
-        std::vector<int> keys;
-        std::vector<float> values;
         HashTable<TTopic, TCount> cxk_sparse;
-        HashTable<TTopic, TCount> new_cxk_sparse;
-        std::vector<TCount> cxk_dense;
         std::vector<TData> local_data;
         float log_likelihood;
         XorShift generator;
-        //AliasUrn urn;
         float total_jll;
+        #if 0
         void Generate3()
         {
             generator.MakeBuffer(r, sizeof(uint32_t) * MH);
@@ -68,8 +63,10 @@ private:
         {
             generator.MakeBuffer(r, sizeof(uint32_t) * MH);
         }
+        #endif
+        uint32_t Rand32() { return generator.Rand32(); }
         LocalBuffer(TTopic K, TDegree maxdegree)
-        : sparse_dense_th(K/4), ck_new(K), cxk_sparse(logceil(K)), cxk_dense(K), local_data(maxdegree)
+        : ck_new(K), cxk_sparse(logceil(K)), local_data(maxdegree)
         {
         }
     };

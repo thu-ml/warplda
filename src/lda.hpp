@@ -18,3 +18,6 @@ public:
     virtual void storeZ(std::string prefix) = 0;
     virtual void writeInfo(std::string vocab, std::string info) = 0;
 };
+
+template <unsigned MH>
+class WarpLDA;

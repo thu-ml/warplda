@@ -28,13 +28,9 @@ class HashTable
 		template <bool AddKey>
 		uint32_t findkey(key_type key)
 		{
-			//printf("find<%d> %d sz %d\n", AddKey, key, table.size());
 			uint32_t pos = key & sizeMask;
 			if (table[pos].key == key)
 			{
-
-		//		count_step[AddKey][0]++;
-			//printf("return find<%d> %d = %d\n", AddKey, key, pos);
 				return pos;
 			}else if (table[pos].key == EMPTY_KEY)
 			{
@@ -42,30 +38,23 @@ class HashTable
 				{
 					table[pos] = Entry{key, value_type(), -1, -1};
 					nKey++;
-			//printf("return find<%d> %d = %d\n", AddKey, key, pos);
-		//			count_step[AddKey][0]++;
 					return pos;
 				}else
 				{
-					//printf("%d : return find<%d> %d = %d\n", GlobalMPI::rank, AddKey, key, -1);
-					//		count_step[AddKey][0]++;
 					return -1;
 				}
 			}else
 			{
-				//int32_t *p = nullptr;
 				int32_t father = -1;
 				bool isleft = true;
 				int i = 0;
 				while (pos != (uint32_t)-1 && table[pos].key != key)
 				{
 					i++;
-					//printf("find<%d> %d at %d (%d, %d,%d))\n", AddKey, key, pos, table[pos].key, table[pos].l, table[pos].r);
 					if (key < table[pos].key)
 					{
 						if (AddKey)
 						{
-							//p = &table[pos].l;
 							father = pos;
 							isleft = true;
 						}
@@ -74,18 +63,14 @@ class HashTable
 					{
 						if (AddKey)
 						{
-							//		p = &table[pos].r;
 							father = pos;
 							isleft = false;
 						}
 						pos = table[pos].r;
 					}
-					//printf("next pos = %d\n", pos);
 				}
-				//		count_step[AddKey][i]++;
 				if (pos == (uint32_t)-1)
 				{
-					//printf("empty pos\n");
 					int current = table.size();
 					if (AddKey)
 					{
@@ -93,23 +78,15 @@ class HashTable
 							table[father].l = current;
 						else
 							table[father].r = current;
-						//printf(" p = %p\n", p);
-						//	*p = table.size();
-						//printf(" pushback\n");
 						table.push_back(Entry{key, value_type(), -1, -1});
 						nKey++;
-						//printf("return find<%d> %d = %d\n", AddKey, key, *p);
-						//return *p;
 						return current;
 					}else
 					{
-						//printf("%d : return find<%d> %d = %d\n", GlobalMPI::rank, AddKey, key, -1);
 						return -1;
-
 					}
 				}else
 				{
-			//printf("return find<%d> %d = %d\n", AddKey, key, pos);
 					return pos;
 				}
 			}
@@ -118,8 +95,6 @@ class HashTable
 	public:
 		HashTable(size_t sizeFactor = 0)
 		{
-		//	count_step[0].assign(100, 0);
-	//		count_step[1].assign(100, 0);
 			Rebuild(sizeFactor);
 		}
         HashTable& operator = (const HashTable &from)

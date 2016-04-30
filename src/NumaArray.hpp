@@ -39,37 +39,18 @@ class RemoteArray64
 
 class NumaInfo
 {
-	public:
-		struct info_t
-		{
-			std::map<int, std::map<int, int>> info;
-			std::map<int, int> ord;
-			std::map<int, int> numa_id;
-			info_t()
-			{
-				#pragma omp parallel
-				{
-					int tid = omp_get_thread_num();
-					int nid = numa_node_of_cpu(tid);
-					#pragma omp critical
-					{
-						numa_id[tid] = nid;
-						ord[tid] = info[nid].size();
-						info[nid][tid] = info[nid].size();
-						//					printf("NumaInfo::Init thread id %d at numa %d ord = %d\n", tid, nid, info[nid][tid]);
-					}
-				}
-			}
-		};
-		static info_t info;
-		NumaInfo(int thread_id, size_t n)
-		{
-			Partition p(info.info.size(), n);
-			beg = p.Startid(info.numa_id[thread_id])+info.ord[thread_id];
-			end = p.Startid(info.numa_id[thread_id]+1);
-			step = info.info[info.numa_id[thread_id]].size();
-		}
-		size_t beg, end, step;
+private:
+	struct info_t
+	{
+		std::map<int, std::map<int, int>> info;
+		std::map<int, int> ord;
+		std::map<int, int> numa_id;
+		info_t();
+	};
+	static info_t info;
+public:
+	NumaInfo(int thread_id, size_t n);
+	size_t beg, end, step;
 };
 
 template <class T>
