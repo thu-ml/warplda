@@ -44,31 +44,20 @@ private:
     void initialize();
     void accept_d_propose_w();
     void accept_w_propose_d();
+    void reduce_ck();
     struct LocalBuffer{
-        //uint32_t r[MH], rn[MH], rk[MH];
         std::vector<TCount> ck_new;
         HashTable<TTopic, TCount> cxk_sparse;
         std::vector<TData> local_data;
         float log_likelihood;
         XorShift generator;
         float total_jll;
-        #if 0
-        void Generate3()
-        {
-            generator.MakeBuffer(r, sizeof(uint32_t) * MH);
-            generator.MakeBuffer(rn, sizeof(uint32_t) * MH);
-            generator.MakeBuffer(rk, sizeof(uint32_t) * MH);
-        }
-        void Generate1()
-        {
-            generator.MakeBuffer(r, sizeof(uint32_t) * MH);
-        }
-        #endif
         uint32_t Rand32() { return generator.Rand32(); }
         LocalBuffer(TTopic K, TDegree maxdegree)
         : ck_new(K), cxk_sparse(logceil(K)), local_data(maxdegree)
         {
         }
+        void Init();
     };
     std::vector<std::unique_ptr<LocalBuffer>> local_buffers;
 };

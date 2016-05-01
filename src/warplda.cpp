@@ -12,6 +12,19 @@ WarpLDA<MH>::WarpLDA() : LDA()
 }
 
 template <unsigned MH>
+void WarpLDA<MH>::reduce_ck()
+{
+    #pragma omp parallel for
+    for (TTopic i = 0; i < K; i++)
+    {
+        TCount s = 0;
+        for (auto& buffer : local_buffers)
+            s += buffer->ck_new[i];
+        ck[i] = s;
+    }
+}
+
+template <unsigned MH>
 void WarpLDA<MH>::initialize()
 {
     shuffle.reset(new Shuffle<TData>(g));
@@ -27,53 +40,36 @@ void WarpLDA<MH>::initialize()
 
 	local_buffers.resize(omp_get_max_threads());
 
-#pragma omp parallel for
+    #pragma omp parallel for reduction(max:max_degree_u)
 	for (TUID i = 0; i < g.NU(); i++)
+    {
+		max_degree_u = std::max(max_degree_u, g.DegreeU(i));
 		nnz_d[i] = g.DegreeU(i);
-#pragma omp parallel for
+    }
+    #pragma omp parallel for
 	for (TVID i = 0; i < g.NV(); i++)
 		nnz_w[i] = g.DegreeV(i);
-	// Initialize cwk, cdk
-#pragma omp parallel for reduction(max:max_degree_u)
-	for (TUID i = 0; i < g.NU(); i++)
-		max_degree_u = std::max(max_degree_u, g.DegreeU(i));
-#pragma omp parallel
-	for (uint32_t i = 0; i < local_buffers.size(); i++) {
-#pragma omp barrier
-		if ((int)i == omp_get_thread_num())
-			local_buffers[i].reset(new LocalBuffer(K, max_degree_u));
-	}
 
-	std::uniform_int_distribution<TTopic> distribution(0, K-1);
+    #pragma omp parallel
+    {
+        #pragma omp critical
+        local_buffers[omp_get_thread_num()].reset(new LocalBuffer(K, max_degree_u));
+    }
 
-#pragma omp parallel for
-	for (uint32_t i = 0; i < local_buffers.size(); i++) {
-		local_buffers[i]->ck_new.assign(K, 0);
-	}
-#pragma omp parallel for
-	for (TVID v = g.Vbegin(); v < g.Vend(); v++)
+	shuffle->VisitByV([&](TVID v, TDegree N, const TUID* lnks, TData* data)
 	{
-		std::vector<TCount> &ck_new = local_buffers[omp_get_thread_num()]->ck_new;
-		TDegree N = g.DegreeV(v);
-		TData* data = shuffle->DataV(v);
+        LocalBuffer* buffer = local_buffers[omp_get_thread_num()].get();
+		TCount* ck_new = buffer->ck_new.data();
 		for (TDegree i = 0; i < N; i++)
 		{
-			TTopic k = distribution(generator);
+			TTopic k = buffer->generator() % K;
 			data[i].oldk = k;
             for (unsigned mh=0; mh<MH; mh++)
                 data[i].newk[mh] = k;
 			++ck_new[k];
 		}
-	}
-
-#pragma omp parallel for
-	for (TTopic i = 0; i < K; i++)
-	{
-		TCount s = 0;
-		for (TDegree j = 0; j < local_buffers.size(); j++)
-			s += local_buffers[j]->ck_new[i];
-		ck[i] = s;
-	}
+	});
+    reduce_ck();
 
 	printf("Initialization finished.\n");
 }
@@ -108,15 +104,21 @@ void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter)
 }
 
 template<unsigned MH>
+void WarpLDA<MH>::LocalBuffer::Init()
+{
+    std::fill(ck_new.begin(), ck_new.end(), 0);
+    log_likelihood = 0;
+    total_jll = 0;
+}
+
+template<unsigned MH>
 void WarpLDA<MH>::accept_d_propose_w()
 {
-#pragma omp parallel for
-	for (unsigned i = 0; i < local_buffers.size(); i++)
+    #pragma omp parallel
     {
-		local_buffers[i]->ck_new.assign(K, 0);
-		local_buffers[i]->log_likelihood = 0;
-        local_buffers[i]->total_jll = 0;
-	}
+        local_buffers[omp_get_thread_num()]->Init();
+    }
+
 	shuffle->VisitByV([&](TVID v, TDegree N, const TUID* lnks, TData* data)
     {
 		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
@@ -156,11 +158,12 @@ void WarpLDA<MH>::accept_d_propose_w()
                 float bc = b*c;
                 bool accept = local_buffer->Rand32() *bc < ad * std::numeric_limits<uint32_t>::max();
                 if (accept) {
-                    data[i].oldk = newk;
+                    oldk = newk;
                     b = a; d = c;
                 }
             }
-            ck_new[data[i].oldk]++;
+            data[i].oldk = oldk;
+            ck_new[oldk]++;
         }
         nnz_w[v] = cxk.NKey();
 
@@ -177,25 +180,20 @@ void WarpLDA<MH>::accept_d_propose_w()
                 data[i].newk[mh] = r < new_topic_th ? rk : data[rn].oldk;
             }
         }
-  });
+    });
 
-#pragma omp parallel for
-	for (TTopic i = 0; i < K; i++)
-	{
-		int s = 0;
-		for (unsigned j = 0; j < local_buffers.size(); j++)
-			s += local_buffers[j]->ck_new[i];
-		ck[i] = s;
-	}
-    lk = ld = lw = 0;
-    for (unsigned i = 0; i < local_buffers.size(); i++)
-    {
-        lw += local_buffers[i]->log_likelihood;
-        total_jll += local_buffers[i]->total_jll;
-    }
+    reduce_ck();
+    double l_lk = 0;
+    #pragma omp parallel for reduction(+:l_lk)
     for (TTopic i = 0; i < K; i++) {
-        //lk -= ck[i] * log(beta_bar + ck[i]);
-        lk -= lgamma(ck[i]+beta_bar) - lgamma(beta_bar);
+        l_lk += -lgamma(ck[i]+beta_bar) + lgamma(beta_bar);
+    }
+    lk = l_lk;
+    lw = 0;
+    for (auto &buffer : local_buffers)
+    {
+        lw += buffer->log_likelihood;
+        total_jll += buffer->total_jll;
     }
     total_log_likelihood = lw + lk;
 }
@@ -203,13 +201,10 @@ void WarpLDA<MH>::accept_d_propose_w()
 template<unsigned MH>
 void WarpLDA<MH>::accept_w_propose_d()
 {
-#pragma omp parallel for
-	for (unsigned i = 0; i < local_buffers.size(); i++)
+    #pragma omp parallel
     {
-		local_buffers[i]->ck_new.assign(K, 0);
-		local_buffers[i]->log_likelihood = 0;
-        local_buffers[i]->total_jll = 0;
-	}
+        local_buffers[omp_get_thread_num()]->Init();
+    }
 	shuffle->VisitURemoteData([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
     {
 		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
@@ -276,19 +271,12 @@ void WarpLDA<MH>::accept_w_propose_d()
             }
         }
     });
-#pragma omp parallel for
-	for (TTopic i = 0; i < K; i++)
-	{
-		TCount s = 0;
-		for (unsigned j = 0; j < local_buffers.size(); j++)
-			s += local_buffers[j]->ck_new[i];
-		ck[i] = s;
-	}
+    reduce_ck();
 	ld = 0;
-	for (unsigned i = 0; i < local_buffers.size(); i++)
+    for (auto& buffer : local_buffers)
 	{
-		ld += local_buffers[i]->log_likelihood;
-		total_jll += local_buffers[i]->total_jll;
+		ld += buffer->log_likelihood;
+		total_jll += buffer->total_jll;
 	}
 	total_log_likelihood += ld;
 }
