@@ -16,9 +16,9 @@ class WarpLDA : public LDA
 public:
     WarpLDA();
     virtual void estimate(int K, float alpha, float beta, int niter) override;
-    virtual void inference(int K, float alpha, float beta, int niter) override;
+    virtual void inference(int niter) override;
     virtual void loadModel(std::string prefix) override;
-    virtual void storeModel(std::string prefix) const override;
+    virtual void storeModel(std::string prefix) override;
     virtual void loadZ(std::string prefix) override;
     virtual void storeZ(std::string prefix) override;
     virtual void writeInfo(std::string vocab, std::string info) override;
@@ -35,14 +35,16 @@ private:
     NumaArray<TCount> nnz_d;
     NumaArray<TCount> nnz_w;
     NumaArray<TCount> ck;
-//    NumaArray<TCount> ck_new;
     std::unique_ptr<Shuffle<TData>> shuffle;
     XorShift generator;
+    std::vector<HashTable<TTopic, TCount>> cwk_model;
     double total_jll;
     double total_log_likelihood;
     double lw, ld, lk;
     void initialize();
+    template <bool testMode = false>
     void accept_d_propose_w();
+    template <bool testMode = false>
     void accept_w_propose_d();
     void reduce_ck();
     struct LocalBuffer{

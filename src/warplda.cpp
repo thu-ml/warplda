@@ -74,34 +74,6 @@ void WarpLDA<MH>::initialize()
 	printf("Initialization finished.\n");
 }
 
-template <unsigned MH>
-void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter)
-{
-    this->K = _K;
-    this->alpha = _alpha;
-    this->beta = _beta;
-    this->niter = _niter;
-    initialize();
-
-	for (int i = 0; i < niter; i++)
-    {
-		Clock clk;
-		clk.start();
-
-        total_jll = 0;
-        accept_d_propose_w();
-        accept_w_propose_d();
-
-        double tm = clk.timeElapsed();
-
-		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
-
-		double jperplexity = exp(-total_log_likelihood / g.NE());
-
-		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ld, lw, lk, exp(-total_jll/g.NE()));
-		fflush(stdout);
-	}
-}
 
 template<unsigned MH>
 void WarpLDA<MH>::LocalBuffer::Init()
@@ -112,6 +84,7 @@ void WarpLDA<MH>::LocalBuffer::Init()
 }
 
 template<unsigned MH>
+template <bool testMode>
 void WarpLDA<MH>::accept_d_propose_w()
 {
     #pragma omp parallel
@@ -124,22 +97,28 @@ void WarpLDA<MH>::accept_d_propose_w()
 		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
 		TCount* ck_new = local_buffer->ck_new.data();
 
-        auto& cxk = local_buffer->cxk_sparse;
-        cxk.Rebuild(logceil(std::min(K, nnz_w[v] * LOAD_FACTOR)));
-
-        for (TDegree i=0; i<N; i++) {
-            cxk.Put(data[i].oldk)++;
+        HashTable<TTopic, TCount>* cxk;
+        if (testMode)
+            cxk = &cwk_model[v];
+        else
+        {
+            cxk = &local_buffer->cxk_sparse;
+            cxk->Rebuild(logceil(std::min(K, nnz_w[v] * LOAD_FACTOR)));
+            for (TDegree i=0; i<N; i++) {
+                cxk->Put(data[i].oldk)++;
+            }
         }
+
         // Perplexity
         float lgammabeta = lgamma(beta);
-        for (auto entry: cxk.table)
-            if (entry.key != cxk.EMPTY_KEY)
+        for (auto entry: cxk->table)
+            if (entry.key != cxk->EMPTY_KEY)
                 local_buffer->log_likelihood += lgamma(beta+entry.value) - lgammabeta;
 
         // p(x, z | phi, theta)
         for (TDegree i=0; i<N; i++) {
             TTopic k = data[i].oldk;
-            float phi = (cxk.Get(k)+beta)/(ck[k]+beta_bar);
+            float phi = (cxk->Get(k)+beta)/(ck[k]+beta_bar);
             local_buffer->total_jll += log(phi);
         }
 
@@ -147,12 +126,12 @@ void WarpLDA<MH>::accept_d_propose_w()
         {
             TTopic oldk = data[i].oldk;
             TTopic originalk = data[i].oldk;
-            float b = cxk.Get(oldk)+beta-1;
+            float b = cxk->Get(oldk)+beta-1;
             float d = ck[oldk]+beta_bar-1;
             //#pragma simd
             for (unsigned mh=0; mh<MH; mh++) {
                 TTopic newk = data[i].newk[mh];
-                float a = cxk.Get(newk)+beta - (newk==originalk);
+                float a = cxk->Get(newk)+beta - (newk==originalk);
                 float c = ck[newk]+beta_bar - (newk==originalk);
                 float ad = a*d;
                 float bc = b*c;
@@ -163,9 +142,10 @@ void WarpLDA<MH>::accept_d_propose_w()
                 }
             }
             data[i].oldk = oldk;
-            ck_new[oldk]++;
+            if (!testMode)
+                ck_new[oldk]++;
         }
-        nnz_w[v] = cxk.NKey();
+        nnz_w[v] = cxk->NKey();
 
         double new_topic = K*beta / (K*beta + N);
         uint32_t new_topic_th = std::numeric_limits<uint32_t>::max() * new_topic;
@@ -182,7 +162,8 @@ void WarpLDA<MH>::accept_d_propose_w()
         }
     });
 
-    reduce_ck();
+    if (!testMode)
+        reduce_ck();
     double l_lk = 0;
     #pragma omp parallel for reduction(+:l_lk)
     for (TTopic i = 0; i < K; i++) {
@@ -199,6 +180,7 @@ void WarpLDA<MH>::accept_d_propose_w()
 }
 
 template<unsigned MH>
+template <bool testMode>
 void WarpLDA<MH>::accept_w_propose_d()
 {
     #pragma omp parallel
@@ -253,7 +235,8 @@ void WarpLDA<MH>::accept_w_propose_d()
                     b = a; d = c;
                 }
             }
-            ck_new[oldk]++;
+            if (!testMode)
+                ck_new[oldk]++;
             local_data[i].oldk = oldk;
         }
         nnz_d[d] = cxk.NKey();
@@ -271,7 +254,8 @@ void WarpLDA<MH>::accept_w_propose_d()
             }
         }
     });
-    reduce_ck();
+    if (!testMode)
+        reduce_ck();
 	ld = 0;
     for (auto& buffer : local_buffers)
 	{
@@ -282,11 +266,118 @@ void WarpLDA<MH>::accept_w_propose_d()
 }
 
 template <unsigned MH>
-void WarpLDA<MH>::inference(int K, float alpha, float beta, int niter)  {}
+void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter)
+{
+    this->K = _K;
+    this->alpha = _alpha;
+    this->beta = _beta;
+    this->niter = _niter;
+    initialize();
+
+	for (int i = 0; i < niter; i++)
+    {
+		Clock clk;
+		clk.start();
+
+        total_jll = 0;
+        accept_d_propose_w();
+        accept_w_propose_d();
+
+        double tm = clk.timeElapsed();
+
+		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
+
+		double jperplexity = exp(-total_log_likelihood / g.NE());
+
+		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ld, lw, lk, exp(-total_jll/g.NE()));
+		fflush(stdout);
+	}
+}
+
 template <unsigned MH>
-void WarpLDA<MH>::loadModel(std::string prefix)  {}
+void WarpLDA<MH>::inference(int niter)
+{
+    initialize();
+	for (int i = 0; i < niter; i++)
+    {
+		Clock clk;
+		clk.start();
+
+        total_jll = 0;
+        accept_d_propose_w<true>();
+        accept_w_propose_d<true>();
+
+        double tm = clk.timeElapsed();
+
+		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
+
+		double jperplexity = exp(-total_log_likelihood / g.NE());
+
+		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ld, lw, lk, exp(-total_jll/g.NE()));
+		fflush(stdout);
+	}
+}
+
 template <unsigned MH>
-void WarpLDA<MH>::storeModel(std::string prefix) const  {}
+void WarpLDA<MH>::loadModel(std::string fmodel)
+{
+    std::cerr << "Load model " << fmodel << std::endl;
+    std::ifstream fin(fmodel);
+    if (!fin)
+        throw std::runtime_error(std::string("Failed to load model file : ") + fmodel);
+    TVID nv = 0;
+    fin >> nv >> K >> alpha >> beta;
+    cwk_model.clear();
+    cwk_model.resize(nv);
+    ck.Assign(K);
+
+    for (TVID v = 0; v < g.NV(); v++)
+    {
+        auto& cwk = cwk_model[v];
+        TTopic nkey;
+        fin >> nkey;
+        cwk.Rebuild(logceil(nkey * LOAD_FACTOR));
+        for (TDegree i = 0; i < nkey; i++) {
+            TTopic k;
+            TCount c;
+            fin >> k; fin.ignore(); fin >> c;
+            cwk.Put(k) = c;
+            ck[k] += c;
+        }
+    }
+    fin.close();
+}
+
+template <unsigned MH>
+void WarpLDA<MH>::storeModel(std::string fmodel)
+{
+    std::cerr << "Store model " << fmodel << std::endl;
+    cwk_model.clear();
+    cwk_model.resize(g.NV());
+	shuffle->VisitByV([&](TVID v, TDegree N, const TUID* lnks, TData* data)
+    {
+        auto& cxk = cwk_model[v];
+        cxk.Rebuild(logceil(std::min(K, nnz_w[v] * LOAD_FACTOR)));
+        for (TDegree i=0; i<N; i++) {
+            cxk.Put(data[i].oldk)++;
+        }
+    });
+    std::ofstream fou(fmodel);
+    if (!fou)
+        throw std::runtime_error(std::string("Failed to store model file : ") + fmodel);
+    fou << g.NV() << ' ' << K << ' ' << alpha << ' ' << beta << std::endl;
+    for (TVID v = 0; v < g.NV(); v++)
+    {
+        auto& cwk = cwk_model[v];
+        fou << cwk.NKey() << '\t';
+
+        for (auto entry: cwk.table)
+        if (entry.key != cwk.EMPTY_KEY)
+            fou << entry.key << ":" << entry.value << ' ';
+        fou << std::endl;
+    }
+    fou.close();
+}
 template <unsigned MH>
 void WarpLDA<MH>::loadZ(std::string prefix)  {}
 template <unsigned MH>

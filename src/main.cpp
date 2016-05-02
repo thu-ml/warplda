@@ -14,9 +14,10 @@ DEFINE_string(bin, "", "binary file");
 DEFINE_string(model, "", "model file");
 DEFINE_string(info, "", "info");
 DEFINE_string(vocab, "", "vocabulary file");
-DEFINE_bool(estimate, true, "estimate");
+DEFINE_bool(estimate, false, "estimate");
 DEFINE_bool(inference, false, "inference");
 DEFINE_bool(writeinfo, false, "write info");
+DEFINE_bool(dumpmodel, true, "dump model");
 
 int main(int argc, char** argv)
 {
@@ -28,14 +29,21 @@ int main(int argc, char** argv)
     SetIfEmpty(FLAGS_info, FLAGS_prefix + ".info");
     SetIfEmpty(FLAGS_vocab, FLAGS_prefix + ".vocab");
 
+    if ((FLAGS_inference || FLAGS_estimate) == false)
+        FLAGS_estimate = true;
+
     LDA *lda = new WarpLDA<1>();
     lda->loadBinary(FLAGS_bin);
     if (FLAGS_estimate)
+    {
         lda->estimate(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter);
+        if (FLAGS_dumpmodel)
+            lda->storeModel(FLAGS_model);
+    }
     else if(FLAGS_inference)
     {
         lda->loadModel(FLAGS_model);
-        lda->inference(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter);
+        lda->inference(FLAGS_niter);
     }
     if (FLAGS_writeinfo)
         lda->writeInfo(FLAGS_vocab, FLAGS_info);
