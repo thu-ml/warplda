@@ -10,6 +10,7 @@ DEFINE_int32(k, 1000, "Num of topics");
 DEFINE_double(alpha, 50, "alpha");
 DEFINE_double(beta, 0.01, "beta");
 DEFINE_int32(mh, 1, "mh steps");
+DEFINE_int32(ntop, 5, "WriteInfo : num top words of each topic");
 DEFINE_string(bin, "", "binary file");
 DEFINE_string(model, "", "model file");
 DEFINE_string(info, "", "info");
@@ -46,6 +47,6 @@ int main(int argc, char** argv)
         lda->inference(FLAGS_niter);
     }
     if (FLAGS_writeinfo)
-        lda->writeInfo(FLAGS_vocab, FLAGS_info);
+        lda->writeInfo(FLAGS_vocab, FLAGS_info, FLAGS_ntop);
 	return 0;
 }

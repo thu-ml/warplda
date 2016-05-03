@@ -1,6 +1,8 @@
 #include <exception>
 #include <random>
+#include <unordered_map>
 #include "warplda.hpp"
+#include "Vocab.hpp"
 #include "clock.hpp"
 
 const int LOAD_FACTOR = 4;
@@ -383,6 +385,79 @@ void WarpLDA<MH>::loadZ(std::string prefix)  {}
 template <unsigned MH>
 void WarpLDA<MH>::storeZ(std::string prefix)  {}
 template <unsigned MH>
-void WarpLDA<MH>::writeInfo(std::string vocab, std::string info) {}
+
+void WarpLDA<MH>::writeInfo(std::string vocab_fname, std::string info, uint32_t ntop)
+{
+    std::cerr << "Write info to " << info << std::endl;
+    Vocab vocab;
+    if (!vocab.load(vocab_fname))
+        throw std::runtime_error(std::string("Failed to load vocab file : ") + vocab_fname);
+
+	std::vector<std::vector<std::vector<std::pair<double, TVID>>>> result; //result[thread][k][10](value, word)
+	result.resize(omp_get_max_threads());
+    #pragma omp parallel
+		result[omp_get_thread_num()].resize(K);
+	shuffle->VisitByV([&](TVID v, TDegree N, const TUID* lnks, TData* data){
+		int tid = omp_get_thread_num();
+		auto &result_local = result[tid];
+		std::unordered_map<TTopic, TCount> cnt;
+		for (TDegree i = 0; i < N; i++)
+		{
+			cnt[data[i].oldk]++;
+		}
+		for (auto t : cnt)
+		{
+			TTopic k = t.first;
+			TCount c = t.second; //ckw
+			auto &r = result_local[k];
+			double value = double(c + beta)/(ck[k]+beta_bar);
+			//printf("ckw %d %d = %lf\n", k, v, value);
+			std::pair<double, TVID> p(value, v);
+			r.push_back(p);
+			std::push_heap(r.begin(), r.end(), std::greater<std::pair<double, TVID>>());
+			if (r.size() > ntop)
+			{
+				std::pop_heap(r.begin(), r.end(), std::greater<std::pair<double, TVID>>());
+				r.pop_back();
+			}
+		}
+	});
+	std::ofstream fou1(info+".full.txt");
+	std::ofstream fou2(info+".words.txt");
+	std::vector<std::vector<std::pair<double, TVID>>> ans;
+	for (TTopic k = 0; k < K; k++)
+	{
+		ans.resize(K);
+		auto &a = ans[k];
+		for (unsigned tid = 0; tid < result.size(); tid++)
+		{
+			auto &r = result[tid][k];
+			for (auto &p : r)
+			{
+				a.push_back(p);
+				std::push_heap(a.begin(), a.end(), std::greater<std::pair<double, TVID>>());
+				if (a.size() > ntop)
+				{
+					std::pop_heap(a.begin(), a.end(), std::greater<std::pair<double,int>>());
+					a.pop_back();
+				}
+			}
+		}
+		std::sort(a.rbegin(), a.rend());
+		fou1 << k << "\t";
+		fou1 << ck[k] << "\t";
+		for (auto &p : a)
+		{
+			std::string word = vocab.getWordById(g.WordId(p.second));
+			fou1 << '('<< p.first << ',' << word << ") ";
+			fou2 << word << " ";
+		}
+		fou1 << std::endl;
+		fou2 << std::endl;
+	}
+	fou1.close();
+	fou2.close();
+
+}
 
 template class WarpLDA<1>;
