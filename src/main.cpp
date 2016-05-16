@@ -17,7 +17,7 @@ DEFINE_string(info, "", "info");
 DEFINE_string(vocab, "", "vocabulary file");
 DEFINE_bool(estimate, false, "estimate");
 DEFINE_bool(inference, false, "inference");
-DEFINE_bool(writeinfo, false, "write info");
+DEFINE_bool(writeinfo, true, "write info");
 DEFINE_bool(dumpmodel, true, "dump model");
 
 int main(int argc, char** argv)
@@ -40,13 +40,13 @@ int main(int argc, char** argv)
         lda->estimate(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter);
         if (FLAGS_dumpmodel)
             lda->storeModel(FLAGS_model);
+        if (FLAGS_writeinfo)
+            lda->writeInfo(FLAGS_vocab, FLAGS_info, FLAGS_ntop);
     }
     else if(FLAGS_inference)
     {
         lda->loadModel(FLAGS_model);
         lda->inference(FLAGS_niter);
     }
-    if (FLAGS_writeinfo)
-        lda->writeInfo(FLAGS_vocab, FLAGS_info, FLAGS_ntop);
 	return 0;
 }
