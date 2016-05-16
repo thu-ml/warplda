@@ -53,9 +53,13 @@ Infer latent topics of some testing data.
 
 ## Output format
 
+## License
+
+MIT
+
 ## Reference
 
-	Please cite WarpLDA if you find it is useful.
+Please cite WarpLDA if you find it is useful!
 
 	@inproceedings{chen2016warplda,
 	  title={WarpLDA: a Cache Efficient O(1) Algorithm for Latent Dirichlet Allocation},
