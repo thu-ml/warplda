@@ -20,8 +20,9 @@ void text_to_bin(std::string in, std::string out, std::string vocab_name, int sk
     v.load(vocab_name);
     int doc_id = 0;
     std::vector<std::pair<TUID, TVID>> edge_list;
-    bool success = ForEachLinesInFile(in, [&](std::istringstream sin)
+    bool success = ForEachLinesInFile(in, [&](std::string line)
     {
+        std::istringstream sin(line);
         std::string w;
         for (int i = 0; sin>>w; i++)
         {

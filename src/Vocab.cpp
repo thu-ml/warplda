@@ -21,8 +21,9 @@ void Vocab::clear()
 bool Vocab::load(std::string fname)
 {
     clear();
-    bool success = ForEachLinesInFile(fname, [&](std::istringstream sin)
+    bool success = ForEachLinesInFile(fname, [&](std::string line)
     {
+        std::istringstream sin(line);
         int id;
         std::string word;
         sin >> id >> word;

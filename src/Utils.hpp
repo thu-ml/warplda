@@ -53,8 +53,7 @@ bool ForEachLinesInFile(std::string fname, Function f)
     std::string line;
     while (std::getline(fin, line))
     {
-        std::istringstream sin(line);
-		f(std::move(sin));
+		f(line);
 	}
 	return true;
 }
