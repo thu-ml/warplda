@@ -312,10 +312,7 @@ void WarpLDA<MH>::inference(int niter)
         double tm = clk.timeElapsed();
 
 		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
-
-		double jperplexity = exp(-total_log_likelihood / g.NE());
-
-		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ld, lw, lk, exp(-total_jll/g.NE()));
+		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood);
 		fflush(stdout);
 	}
 }
@@ -382,10 +379,13 @@ void WarpLDA<MH>::storeModel(std::string fmodel)
 }
 template <unsigned MH>
 void WarpLDA<MH>::loadZ(std::string prefix)  {}
-template <unsigned MH>
-void WarpLDA<MH>::storeZ(std::string prefix)  {}
-template <unsigned MH>
 
+template <unsigned MH>
+void WarpLDA<MH>::storeZ(std::string prefix)  {
+
+}
+
+template <unsigned MH>
 void WarpLDA<MH>::writeInfo(std::string vocab_fname, std::string info, uint32_t ntop)
 {
     std::cerr << "Write info to " << info << std::endl;
