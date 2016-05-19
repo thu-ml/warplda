@@ -38,6 +38,17 @@ public:
 		}
 	}
 	template <class Function>
+	void VisitURemoteDataSequential(Function f)
+	{
+		for (TUID u = g_.Ubegin(); u < g_.Uend(); u++)
+		{
+			TDegree N = g_.DegreeU(u);
+			const TVID* lnks = g_.EdgeOfU(u);
+			RemoteArray64<T> data = RemoteArray64<T>(DataV(0), &v2u_shuffle_pos_[g_.UIdx(u)]);
+			f(u, N, lnks, data);
+		}
+	}
+	template <class Function>
 	void VisitByV(Function f)
 	{
 		#pragma omp parallel for

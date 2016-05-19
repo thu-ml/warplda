@@ -312,7 +312,7 @@ void WarpLDA<MH>::inference(int niter)
         double tm = clk.timeElapsed();
 
 		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
-		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood);
+		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood);
 		fflush(stdout);
 	}
 }
@@ -320,7 +320,6 @@ void WarpLDA<MH>::inference(int niter)
 template <unsigned MH>
 void WarpLDA<MH>::loadModel(std::string fmodel)
 {
-    std::cerr << "Load model " << fmodel << std::endl;
     std::ifstream fin(fmodel);
     if (!fin)
         throw std::runtime_error(std::string("Failed to load model file : ") + fmodel);
@@ -350,7 +349,6 @@ void WarpLDA<MH>::loadModel(std::string fmodel)
 template <unsigned MH>
 void WarpLDA<MH>::storeModel(std::string fmodel)
 {
-    std::cerr << "Store model " << fmodel << std::endl;
     cwk_model.clear();
     cwk_model.resize(g.NV());
 	shuffle->VisitByV([&](TVID v, TDegree N, const TUID* lnks, TData* data)
@@ -378,17 +376,36 @@ void WarpLDA<MH>::storeModel(std::string fmodel)
     fou.close();
 }
 template <unsigned MH>
-void WarpLDA<MH>::loadZ(std::string prefix)  {}
+void WarpLDA<MH>::loadZ(std::string filez)
+{
+    std::ifstream fin(filez);
+	shuffle->VisitURemoteDataSequential([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
+    {
+        for (unsigned i = 0; i < N; i++)
+        {
+            fin >> data[i].oldk;
+        }
+    });
+    fin.close();
+}
 
 template <unsigned MH>
-void WarpLDA<MH>::storeZ(std::string prefix)  {
-
+void WarpLDA<MH>::storeZ(std::string filez)  {
+    std::ofstream fou(filez);
+	shuffle->VisitURemoteDataSequential([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
+    {
+        for (unsigned i = 0; i < N; i++)
+        {
+            fou << data[i].oldk << ' ';
+        }
+        fou << std::endl;
+    });
+    fou.close();
 }
 
 template <unsigned MH>
 void WarpLDA<MH>::writeInfo(std::string vocab_fname, std::string info, uint32_t ntop)
 {
-    std::cerr << "Write info to " << info << std::endl;
     Vocab vocab;
     if (!vocab.load(vocab_fname))
         throw std::runtime_error(std::string("Failed to load vocab file : ") + vocab_fname);
@@ -448,7 +465,7 @@ void WarpLDA<MH>::writeInfo(std::string vocab_fname, std::string info, uint32_t 
 		fou1 << ck[k] << "\t";
 		for (auto &p : a)
 		{
-			std::string word = vocab.getWordById(g.WordId(p.second));
+			std::string word = vocab.getWordById(p.second);
 			fou1 << '('<< p.first << ',' << word << ") ";
 			fou2 << word << " ";
 		}

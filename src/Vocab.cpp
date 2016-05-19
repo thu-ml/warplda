@@ -79,3 +79,13 @@ int Vocab::nWords() const
 {
     return words.size();
 }
+
+void Vocab::RearrangeId(const unsigned int* new_id)
+{
+    for (auto &e : this->dict)
+        e.second = new_id[e.second];
+    decltype(words) new_words(words.size());
+    for (unsigned i = 0; i < words.size(); i++)
+        new_words[new_id[i]] = words[i];
+    words = std::move(new_words);
+}

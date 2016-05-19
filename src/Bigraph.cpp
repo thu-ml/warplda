@@ -12,12 +12,15 @@ bool Bigraph::Load(std::string name)
 {
 	if (u.Load(name + ".u") && v.Load(name + ".v"))
 	{
+		return true;
+		#if 0
 		std::ifstream fwordid(name + ".wordid", std::ios::binary);
 		if (fwordid){
 			word_id.resize(NV());
 			if (fwordid.read((char*)&word_id[0], NV() * sizeof(TVID)))
 				return true;
 		}
+		#endif
 	}
 	return false;
 }
@@ -35,6 +38,7 @@ void Bigraph::Generate(std::string name, std::vector<std::pair<TUID, TVID>>& edg
 	nu = nu + 1;
 	nv = nv + 1;
 
+#if 0
 	std::vector<TUID> pu(nu);
 	std::vector<TVID> pv(nv);
 	for (TUID i = 0; i < nu; i++)
@@ -55,6 +59,7 @@ void Bigraph::Generate(std::string name, std::vector<std::pair<TUID, TVID>>& edg
 	std::ofstream fwordid(name + ".wordid", std::ios::binary);
 	fwordid.write((char*)&word_id[0], nv * sizeof(TVID));
 	fwordid.close();
+#endif
 
 	std::ofstream fuidx(name + ".u.idx", std::ios::binary);
 	std::ofstream fulnk(name + ".u.lnk", std::ios::binary);

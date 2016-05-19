@@ -11,7 +11,9 @@ class Bigraph
 	private:
 		TAdjU u;
 		TAdjV v;
+		#if 0
 		std::vector<TVID> word_id;
+		#endif
 	public:
 		Bigraph();
 		bool Load(std::string);
@@ -60,5 +62,5 @@ class Bigraph
 
 		TVID Vbegin() { return v.Begin(); }
 		TVID Vend() { return v.End(); }
-		TVID WordId(TVID vid) { return word_id[vid]; }
+//		TVID WordId(TVID vid) { return word_id[vid]; }
 };
