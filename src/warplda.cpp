@@ -83,7 +83,6 @@ void WarpLDA<MH>::LocalBuffer::Init()
 {
     std::fill(ck_new.begin(), ck_new.end(), 0);
     log_likelihood = 0;
-    total_jll = 0;
 }
 
 template<unsigned MH>
@@ -117,13 +116,6 @@ void WarpLDA<MH>::accept_d_propose_w()
         for (auto entry: cxk->table)
             if (entry.key != cxk->EMPTY_KEY)
                 local_buffer->log_likelihood += lgamma(beta+entry.value) - lgammabeta;
-
-        // p(x, z | phi, theta)
-        for (TDegree i=0; i<N; i++) {
-            TTopic k = data[i].oldk;
-            float phi = (cxk->Get(k)+beta)/(ck[k]+beta_bar);
-            local_buffer->total_jll += log(phi);
-        }
 
         for (TDegree i = 0; i < N; i++)
         {
@@ -167,19 +159,12 @@ void WarpLDA<MH>::accept_d_propose_w()
 
     if (!testMode)
         reduce_ck();
-    double l_lk = 0;
-    #pragma omp parallel for reduction(+:l_lk)
-    for (TTopic i = 0; i < K; i++) {
-        l_lk += -lgamma(ck[i]+beta_bar) + lgamma(beta_bar);
-    }
-    lk = l_lk;
-    lw = 0;
+
+    for (TTopic i = 0; i < K; i++)
+        total_log_likelihood += -lgamma(ck[i]+beta_bar) + lgamma(beta_bar);
+
     for (auto &buffer : local_buffers)
-    {
-        lw += buffer->log_likelihood;
-        total_jll += buffer->total_jll;
-    }
-    total_log_likelihood = lw + lk;
+        total_log_likelihood += buffer->log_likelihood;
 }
 
 template<unsigned MH>
@@ -211,12 +196,6 @@ void WarpLDA<MH>::accept_w_propose_d()
         local_buffer->log_likelihood += lgamma(alpha+entry.value) - lgammaalpha;
 
         local_buffer->log_likelihood -= lgamma(alpha_bar+N) - lgamma(alpha_bar);
-
-        for (TDegree i=0; i<N; i++) {
-            TTopic k = data[i].oldk;
-            float theta = (cxk.Get(k)+alpha) / (N+alpha_bar);
-            local_buffer->total_jll += log(theta);
-        }
 
         for (TDegree i = 0; i < N; i++)
         {
@@ -259,13 +238,8 @@ void WarpLDA<MH>::accept_w_propose_d()
     });
     if (!testMode)
         reduce_ck();
-	ld = 0;
     for (auto& buffer : local_buffers)
-	{
-		ld += buffer->log_likelihood;
-		total_jll += buffer->total_jll;
-	}
-	total_log_likelihood += ld;
+		total_log_likelihood += buffer->log_likelihood;
 }
 
 template <unsigned MH>
@@ -282,21 +256,20 @@ void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter, int _p
 		Clock clk;
 		clk.start();
 
-        total_jll = 0;
+        total_log_likelihood = 0;
         accept_d_propose_w();
         accept_w_propose_d();
 
         double ppl = 0;
-        if (_perperplexity_interval != -1 && i % _perperplexity_interval == 0)
+        bool eval_perplexity = _perperplexity_interval != -1 && i % _perperplexity_interval == 0;
+		// Evaluate perplexity p(w_d | \hat\theta, \hat\phi)
+        if (eval_perplexity)
             ppl = perplexity();
 
         double tm = clk.timeElapsed();
-
-		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
-
-		double jperplexity = exp(-total_log_likelihood / g.NE());
-
-		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf perplexity = %lf, ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ppl, ld, lw, lk, exp(-total_jll/g.NE()));
+		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood (per token) %lf", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood/g.NE());
+        if (eval_perplexity) printf(" perplexity %lf\n", ppl);
+        else printf("\n");
 		fflush(stdout);
 	}
 }
@@ -310,7 +283,6 @@ void WarpLDA<MH>::inference(int niter)
 		Clock clk;
 		clk.start();
 
-        total_jll = 0;
         accept_d_propose_w<true>();
         accept_w_propose_d<true>();
 

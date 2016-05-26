@@ -39,9 +39,7 @@ private:
     std::unique_ptr<Shuffle<TData>> shuffle;
     XorShift generator;
     std::vector<HashTable<TTopic, TCount>> cwk_model;
-    double total_jll;
-    double total_log_likelihood;
-    double lw, ld, lk;
+    double total_log_likelihood;        // p(w | \alpha, \beta)
     void initialize();
     template <bool testMode = false>
     void accept_d_propose_w();
@@ -54,7 +52,6 @@ private:
         std::vector<TData> local_data;
         float log_likelihood;
         XorShift generator;
-        float total_jll;
         uint32_t Rand32() { return generator.Rand32(); }
         LocalBuffer(TTopic K, TDegree maxdegree)
         : ck_new(K), cxk_sparse(logceil(K)), local_data(maxdegree)
