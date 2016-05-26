@@ -15,13 +15,14 @@ class WarpLDA : public LDA
 {
 public:
     WarpLDA();
-    virtual void estimate(int K, float alpha, float beta, int niter) override;
+    virtual void estimate(int K, float alpha, float beta, int niter, int perplexity_interval) override;
     virtual void inference(int niter) override;
     virtual void loadModel(std::string prefix) override;
     virtual void storeModel(std::string prefix) override;
     virtual void loadZ(std::string prefix) override;
     virtual void storeZ(std::string prefix) override;
     virtual void writeInfo(std::string vocab, std::string info, uint32_t ntop) override;
+    double perplexity();
 
 private:
     struct TData
@@ -31,7 +32,7 @@ private:
     };
     TTopic K;
     float alpha, beta, alpha_bar, beta_bar;
-    int niter;
+    int niter, perplexity_interval;
     NumaArray<TCount> nnz_d;
     NumaArray<TCount> nnz_w;
     NumaArray<TCount> ck;

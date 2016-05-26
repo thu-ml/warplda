@@ -22,6 +22,7 @@ DEFINE_bool(inference, false, "inference latent topic assignments");
 DEFINE_bool(writeinfo, true, "write info");
 DEFINE_bool(dumpmodel, true, "dump model");
 DEFINE_bool(dumpz, true, "dump Z");
+DEFINE_int32(perplexity, -1, "Interval to evaluate perplexity. -1 for don't evaluate.");
 
 int main(int argc, char** argv)
 {
@@ -43,7 +44,7 @@ int main(int argc, char** argv)
     lda->loadBinary(FLAGS_bin);
     if (FLAGS_estimate)
     {
-        lda->estimate(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter);
+        lda->estimate(FLAGS_k, FLAGS_alpha / FLAGS_k, FLAGS_beta, FLAGS_niter, FLAGS_perplexity);
         if (FLAGS_dumpmodel)
         {
             std::cout << "Dump model " << FLAGS_model << std::endl;

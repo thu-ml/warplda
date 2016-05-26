@@ -4,6 +4,7 @@
 #include "warplda.hpp"
 #include "Vocab.hpp"
 #include "clock.hpp"
+#include <exception>
 
 const int LOAD_FACTOR = 4;
 
@@ -268,7 +269,7 @@ void WarpLDA<MH>::accept_w_propose_d()
 }
 
 template <unsigned MH>
-void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter)
+void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter, int _perperplexity_interval)
 {
     this->K = _K;
     this->alpha = _alpha;
@@ -285,13 +286,17 @@ void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter)
         accept_d_propose_w();
         accept_w_propose_d();
 
+        double ppl = 0;
+        if (_perperplexity_interval != -1 && i % _perperplexity_interval == 0)
+            ppl = perplexity();
+
         double tm = clk.timeElapsed();
 
 		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
 
 		double jperplexity = exp(-total_log_likelihood / g.NE());
 
-		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ld, lw, lk, exp(-total_jll/g.NE()));
+		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf jperplexity %lf perplexity = %lf, ld %f lw %f lk %f jll %f\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood, jperplexity, ppl, ld, lw, lk, exp(-total_jll/g.NE()));
 		fflush(stdout);
 	}
 }
@@ -475,6 +480,70 @@ void WarpLDA<MH>::writeInfo(std::string vocab_fname, std::string info, uint32_t 
 	fou1.close();
 	fou2.close();
 
+}
+
+template <unsigned MH>
+double WarpLDA<MH>::perplexity()
+{
+    std::vector<std::vector<std::pair<int, int>>> cdk(g.NU());
+	shuffle->VisitURemoteData([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data) {
+		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
+
+        auto& cxk = local_buffer->cxk_sparse;
+        cxk.Rebuild(logceil(std::min(K, nnz_d[d] * LOAD_FACTOR)));
+
+        for (TDegree i=0; i<N; i++)
+            cxk.Put(data[i].oldk)++;
+
+        int Kd = 0;
+        for (auto &entry: cxk.table)
+            if (entry.key != cxk.EMPTY_KEY)
+                Kd++;
+
+        auto &local_cdk = cdk[d];
+        local_cdk.resize(Kd);
+        Kd = 0;
+        for (auto &entry: cxk.table)
+            if (entry.key != cxk.EMPTY_KEY)
+                local_cdk[Kd++] = std::make_pair(entry.key, entry.value);
+    });
+
+    #pragma omp parallel
+    {
+        local_buffers[omp_get_thread_num()]->Init();
+    }
+
+	shuffle->VisitByV([&](TVID v, TDegree N, const TUID* lnks, TData* data)
+	{
+		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
+
+        auto &cxk = local_buffer->cxk_sparse;
+        cxk.Rebuild(logceil(std::min(K, nnz_w[v] * LOAD_FACTOR)));
+        double alpha_term = 0;
+        for (TDegree i=0; i<N; i++) {
+            cxk.Put(data[i].oldk)++;
+        }
+        for (TTopic k = 0; k < K; k++)
+            alpha_term += alpha * (cxk.Get(k) + beta) / (ck[k] + beta_bar);
+
+        for (TDegree i=0; i<N; i++) {
+            double prob = 0;
+            double L = 0;
+            auto &local_cdk = cdk[lnks[i]];
+            for (auto &entry: local_cdk) {
+                L += entry.second;
+                prob += entry.second * (cxk.Get(entry.first) + beta) / (ck[entry.first] + beta_bar);
+            }
+            prob += alpha_term;
+            prob /= (L + alpha_bar);
+            local_buffer->log_likelihood += log(prob);
+        }
+    });
+    double log_likelihood = 0;
+    for (auto &buffer : local_buffers)
+        log_likelihood += buffer->log_likelihood;
+
+    return exp(-log_likelihood / g.NE());
 }
 
 template class WarpLDA<1>;
