@@ -75,6 +75,13 @@ WarpLDA generates a number of files:
 
 * `warplda -inference` generates `.z.inference`, whose format is the same as `.z.estimate`.
 
+## Other features
+
+* Use custom prefix for output `-prefix myprefix`
+* Output perplexity every 10 iterations `-perplexity 10`
+* Tune Dirichlet hyperparameters `-alpha 10 -beta 0.1`
+* Get superior performance `OMP_PROC_BIND=true ./warplda [options]`
+
 ## License
 
 MIT
