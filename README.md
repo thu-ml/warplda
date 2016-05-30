@@ -22,7 +22,7 @@ Download some data
 
 	mkdir data
 	cd data
-	wget blah
+	wget https://raw.githubusercontent.com/sudar/Yahoo_LDA/master/test/ydir_1k.txt
 
 Compile the project
 
@@ -34,11 +34,11 @@ Compile the project
 
 Format the data
 
-	./format -input ../../data/nips.txt
+	./format -input ../../data/ydir_1k.txt
 
 Train the model
 
-	./warplda --k 100 --niter 100
+	./warplda --k 100 --niter 300
 
 Check the result. Each line is a topic, its id, number of tokens assigned to it, and ten most frequent words with their probabilities.
 
@@ -46,7 +46,7 @@ Check the result. Each line is a topic, its id, number of tokens assigned to it,
 
 Infer latent topics of some testing data.
 
-	# TODO
+	./warplda --inference -niter 40 --perplexity 10
 
 ## Data format
 

@@ -12,7 +12,7 @@ DEFINE_string(prefix, "./prefix", "prefix of temporary files");
 DEFINE_string(vocab, "", "vocabulary file");
 DEFINE_string(input, "", "input file");
 DEFINE_string(output, "", "output file");
-DEFINE_string(method, "", "text2bin");
+DEFINE_string(method, "text2bin", "type of input");
 //DEFINE_string(method, "", "text2bin/libsvm2bin");
 DEFINE_int32(skip, 2, "skip num of words at first of each line");
 
