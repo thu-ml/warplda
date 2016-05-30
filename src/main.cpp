@@ -65,7 +65,7 @@ int main(int argc, char** argv)
     else if(FLAGS_inference)
     {
         lda->loadModel(FLAGS_model);
-        lda->inference(FLAGS_niter);
+        lda->inference(FLAGS_niter, FLAGS_perplexity);
         if (FLAGS_dumpz)
         {
             SetIfEmpty(FLAGS_z, FLAGS_prefix + ".z.inference");

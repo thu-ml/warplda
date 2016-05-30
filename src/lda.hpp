@@ -11,7 +11,7 @@ public:
     LDA() {}
     virtual void loadBinary(std::string prefix);
     virtual void estimate(int K, float alpha, float beta, int niter, int perplexity_interval) = 0;
-    virtual void inference(int niter) = 0;
+    virtual void inference(int niter, int perplexity_interval) = 0;
     virtual void loadModel(std::string prefix) = 0;
     virtual void storeModel(std::string prefix) = 0;
     virtual void loadZ(std::string prefix) = 0;

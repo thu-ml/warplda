@@ -6,6 +6,7 @@
 #include "Xorshift.hpp"
 #include "Utils.hpp"
 #include "Shuffle.hpp"
+#include "alias_urn.h"
 
 template <unsigned MH>
 class WarpLDA;
@@ -16,13 +17,12 @@ class WarpLDA : public LDA
 public:
     WarpLDA();
     virtual void estimate(int K, float alpha, float beta, int niter, int perplexity_interval) override;
-    virtual void inference(int niter) override;
+    virtual void inference(int niter, int perplexity_interval) override;
     virtual void loadModel(std::string prefix) override;
     virtual void storeModel(std::string prefix) override;
     virtual void loadZ(std::string prefix) override;
     virtual void storeZ(std::string prefix) override;
     virtual void writeInfo(std::string vocab, std::string info, uint32_t ntop) override;
-    double perplexity();
 
 private:
     struct TData
@@ -39,7 +39,14 @@ private:
     std::unique_ptr<Shuffle<TData>> shuffle;
     XorShift generator;
     std::vector<HashTable<TTopic, TCount>> cwk_model;
+    std::vector<AliasUrn> cwk_urns;
+    std::vector<double> cwk_sums;
+    AliasUrn global_urn;
+    double global_sum;
     double total_log_likelihood;        // p(w | \alpha, \beta)
+    template <bool testMode = false>
+    double perplexity();
+    template <bool testMode = false>
     void initialize();
     template <bool testMode = false>
     void accept_d_propose_w();

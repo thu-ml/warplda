@@ -34,8 +34,7 @@ Compile the project
 
 Format the data
 
-	./transform -input ../../data/nips.txt -method text2bin -skip 2	# Yahoo! LDA format
-	# TODO libsvm format
+	./format -input ../../data/nips.txt
 
 Train the model
 
@@ -53,11 +52,28 @@ Infer latent topics of some testing data.
 
 The data format is identical to Yahoo! LDA. The input data is a text file with a number of lines, where each line is a document. The format of each line is
 
-	id1	id2 word1 word2 word3 ...
+    id1 id2 word1 word2 word3 ...
 
 id1, id2 are two string document identifiers, and each word is a string, separated by white space.
 
 ## Output format
+
+WarpLDA generates a number of files:
+
+* `format` generates `.vocab`, where each line of it is a word in the vocabulary.
+* `warplda -estimate` generates the following files
+	- `.info.full.txt` is the most frequent words for each topic. Each line is a topic, with its topic it, number of tokens assigned to it, and a number of most frequent words in the format `(probability, word)`. The number of most frequent words is controlled by `-ntop`. `.info.words.txt` is a simpler version which only contains words.
+
+  - `.model` is the model (i.e., the word-topic count matrix). The first line contains four integers
+		     <size of vocabulary> <number of topics> <alpha> <beta>
+	Each of the remaining lines is a row of the word-topic count matrix, represented in the libsvm sparse vector format,
+	       <number of elements> index:count index:count ...
+  For example, `0:2` on the first line means that the first word in the vocabulary is assigned to topic 0 for 2 times.
+
+  - `.z.estimate` is the topic assignments of each token in the libsvm format. Each line is a document,
+	        <number of tokens> <word id>:<topic id> <word id>:<topic id> ...
+
+* `warplda -inference` generates `.z.inference`, whose format is the same as `.z.estimate`.
 
 ## License
 

@@ -5,6 +5,7 @@
 #include "Vocab.hpp"
 #include "clock.hpp"
 #include <exception>
+#include <atomic>
 
 const int LOAD_FACTOR = 4;
 
@@ -28,13 +29,15 @@ void WarpLDA<MH>::reduce_ck()
 }
 
 template <unsigned MH>
+template <bool testMode>
 void WarpLDA<MH>::initialize()
 {
     shuffle.reset(new Shuffle<TData>(g));
 	alpha_bar = alpha * K;
 	beta_bar = beta * g.NV();
 
-	ck.Assign(K, 0);
+	if (!testMode)
+        ck.Assign(K, 0);
 
 	nnz_d.Assign(g.NU());
 	nnz_w.Assign(g.NV());
@@ -72,7 +75,8 @@ void WarpLDA<MH>::initialize()
 			++ck_new[k];
 		}
 	});
-    reduce_ck();
+    if (!testMode)
+        reduce_ck();
 
 	printf("Initialization finished.\n");
 }
@@ -117,17 +121,24 @@ void WarpLDA<MH>::accept_d_propose_w()
             if (entry.key != cxk->EMPTY_KEY)
                 local_buffer->log_likelihood += lgamma(beta+entry.value) - lgammabeta;
 
+        int remove_current = !testMode;
         for (TDegree i = 0; i < N; i++)
         {
             TTopic oldk = data[i].oldk;
             TTopic originalk = data[i].oldk;
-            float b = cxk->Get(oldk)+beta-1;
-            float d = ck[oldk]+beta_bar-1;
+            float b = cxk->Get(oldk)+beta-remove_current;
+            float d = ck[oldk]+beta_bar-remove_current;
             //#pragma simd
             for (unsigned mh=0; mh<MH; mh++) {
                 TTopic newk = data[i].newk[mh];
-                float a = cxk->Get(newk)+beta - (newk==originalk);
-                float c = ck[newk]+beta_bar - (newk==originalk);
+                float a, c;
+                if (testMode) {
+                    a = cxk->Get(newk)+beta - (newk==originalk);
+                    c = ck[newk]+beta_bar - (newk==originalk);
+                } else {
+                    a = cxk->Get(newk)+beta;
+                    c = ck[newk]+beta_bar;
+                }
                 float ad = a*d;
                 float bc = b*c;
                 bool accept = local_buffer->Rand32() *bc < ad * std::numeric_limits<uint32_t>::max();
@@ -145,14 +156,33 @@ void WarpLDA<MH>::accept_d_propose_w()
         double new_topic = K*beta / (K*beta + N);
         uint32_t new_topic_th = std::numeric_limits<uint32_t>::max() * new_topic;
 
-        for (TDegree i = 0; i < N; i++)
-        {
-            for (unsigned mh=0; mh<MH; mh++)
+        // TODO this propose is incorrect!
+        // TODO use alias table
+        if (!testMode) {
+            for (TDegree i = 0; i < N; i++)
             {
-                uint32_t r= local_buffer->Rand32();
-                uint32_t rk = local_buffer->Rand32() % K;
-                uint32_t rn = local_buffer->Rand32() % N;
-                data[i].newk[mh] = r < new_topic_th ? rk : data[rn].oldk;
+                for (unsigned mh=0; mh<MH; mh++)
+                {
+                    uint32_t r= local_buffer->Rand32();
+                    uint32_t rk = local_buffer->Rand32() % K;
+                    uint32_t rn = local_buffer->Rand32() % N;
+                    data[i].newk[mh] = r < new_topic_th ? rk : data[rn].oldk;
+                }
+            }
+        } else {
+            unsigned global_th = std::numeric_limits<uint32_t>::max()
+                * (global_sum / (global_sum + cwk_sums[v]));
+            double one_scale = 1.0 / ((double)std::numeric_limits<uint32_t>::max()+1);
+            for (TDegree i = 0; i < N; i++)
+            {
+                for (unsigned mh=0; mh<MH; mh++)
+                {
+                    uint32_t r = local_buffer->Rand32();
+                    if (r < global_th)
+                        data[i].newk[mh] = global_urn.DrawSample(local_buffer->Rand32(), local_buffer->Rand32() * one_scale);
+                    else
+                        data[i].newk[mh] = cwk_urns[v].DrawSample(local_buffer->Rand32(), local_buffer->Rand32() * one_scale);
+                }
             }
         }
     });
@@ -192,8 +222,8 @@ void WarpLDA<MH>::accept_w_propose_d()
         // Perplexity
         float lgammaalpha = lgamma(alpha);
         for (auto entry: cxk.table)
-        if (entry.key != cxk.EMPTY_KEY)
-        local_buffer->log_likelihood += lgamma(alpha+entry.value) - lgammaalpha;
+            if (entry.key != cxk.EMPTY_KEY)
+                local_buffer->log_likelihood += lgamma(alpha+entry.value) - lgammaalpha;
 
         local_buffer->log_likelihood -= lgamma(alpha_bar+N) - lgamma(alpha_bar);
 
@@ -275,9 +305,9 @@ void WarpLDA<MH>::estimate(int _K, float _alpha, float _beta, int _niter, int _p
 }
 
 template <unsigned MH>
-void WarpLDA<MH>::inference(int niter)
+void WarpLDA<MH>::inference(int niter, int _perperplexity_interval)
 {
-    initialize();
+    initialize<true>();
 	for (int i = 0; i < niter; i++)
     {
 		Clock clk;
@@ -288,8 +318,16 @@ void WarpLDA<MH>::inference(int niter)
 
         double tm = clk.timeElapsed();
 
+        double ppl = 0;
+        bool eval_perplexity = _perperplexity_interval != -1 && i % _perperplexity_interval == 0;
+		// Evaluate perplexity p(w_d | \hat\theta, \hat\phi)
+        if (eval_perplexity)
+            ppl = perplexity<true>();
+
 		// Evaluate likelihood p(w_d | \hat\theta, \hat\phi)
-		printf("Iteration %d, %f s, %.2f Mtokens/s, log_likelihood %lf\n", i, tm, (double)g.NE()/tm/1e6, total_log_likelihood);
+		printf("Iteration %d, %f s, %.2f Mtokens/s ", i, tm, (double)g.NE()/tm/1e6);
+        if (eval_perplexity) printf(" perplexity %lf\n", ppl);
+        else printf("\n");
 		fflush(stdout);
 	}
 }
@@ -304,7 +342,11 @@ void WarpLDA<MH>::loadModel(std::string fmodel)
     fin >> nv >> K >> alpha >> beta;
     cwk_model.clear();
     cwk_model.resize(nv);
+    cwk_urns.resize(nv);
+    cwk_sums.resize(nv);
     ck.Assign(K);
+	alpha_bar = alpha * K;
+	beta_bar = beta * g.NV();
 
     for (TVID v = 0; v < g.NV(); v++)
     {
@@ -321,6 +363,28 @@ void WarpLDA<MH>::loadModel(std::string fmodel)
         }
     }
     fin.close();
+
+    std::vector<TTopic> kds;
+    std::vector<double> probs(K);
+    global_sum = 0;
+    for (TTopic k = 0; k < K; k++)
+        global_sum += probs[k] = beta / (ck[k] + beta_bar);
+    global_urn.BuildAlias(probs, generator.Rand32());
+    for (TVID v = 0; v < g.NV(); v++)
+    {
+        kds.clear();
+        probs.clear();
+        auto &cwk = cwk_model[v];
+        cwk_sums[v] = 0;
+        for (auto &entry: cwk.table) if (entry.key != cwk.EMPTY_KEY) {
+            kds.push_back(entry.key);
+            double p = entry.value / (ck[entry.key] + beta_bar);
+            probs.push_back(p);
+            cwk_sums[v] += p;
+        }
+        cwk_urns[v].BuildAlias(probs, generator.Rand32());
+        cwk_urns[v].SetKeys(kds);
+    }
 }
 
 template <unsigned MH>
@@ -355,15 +419,16 @@ void WarpLDA<MH>::storeModel(std::string fmodel)
 template <unsigned MH>
 void WarpLDA<MH>::loadZ(std::string filez)
 {
-    std::ifstream fin(filez);
-	shuffle->VisitURemoteDataSequential([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
-    {
-        for (unsigned i = 0; i < N; i++)
-        {
-            fin >> data[i].oldk;
-        }
-    });
-    fin.close();
+    throw std::runtime_error("This method is not implemented");
+    //std::ifstream fin(filez);
+	//shuffle->VisitURemoteDataSequential([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
+    //{
+    //    for (unsigned i = 0; i < N; i++)
+    //    {
+    //        fin >> data[i].oldk;
+    //    }
+    //});
+    //fin.close();
 }
 
 template <unsigned MH>
@@ -371,11 +436,12 @@ void WarpLDA<MH>::storeZ(std::string filez)  {
     std::ofstream fou(filez);
 	shuffle->VisitURemoteDataSequential([&](TUID d, TDegree N, const TVID* lnks, RemoteArray64<TData> &data)
     {
+        fou << N << ' ';
         for (unsigned i = 0; i < N; i++)
         {
-            fou << data[i].oldk << ' ';
+            fou << lnks[i] << ':' << data[i].oldk << ' ';
         }
-        fou << std::endl;
+        fou << '\n';
     });
     fou.close();
 }
@@ -455,6 +521,7 @@ void WarpLDA<MH>::writeInfo(std::string vocab_fname, std::string info, uint32_t 
 }
 
 template <unsigned MH>
+template <bool testMode>
 double WarpLDA<MH>::perplexity()
 {
     std::vector<std::vector<std::pair<int, int>>> cdk(g.NU());
@@ -489,11 +556,13 @@ double WarpLDA<MH>::perplexity()
 	{
 		LocalBuffer *local_buffer = local_buffers[omp_get_thread_num()].get();
 
-        auto &cxk = local_buffer->cxk_sparse;
-        cxk.Rebuild(logceil(std::min(K, nnz_w[v] * LOAD_FACTOR)));
+        auto &cxk = !testMode ? local_buffer->cxk_sparse : cwk_model[v];
         double alpha_term = 0;
-        for (TDegree i=0; i<N; i++) {
-            cxk.Put(data[i].oldk)++;
+        if (!testMode) {
+            cxk.Rebuild(logceil(std::min(K, nnz_w[v] * LOAD_FACTOR)));
+            for (TDegree i=0; i<N; i++) {
+                cxk.Put(data[i].oldk)++;
+            }
         }
         for (TTopic k = 0; k < K; k++)
             alpha_term += alpha * (cxk.Get(k) + beta) / (ck[k] + beta_bar);
@@ -505,6 +574,10 @@ double WarpLDA<MH>::perplexity()
             for (auto &entry: local_cdk) {
                 L += entry.second;
                 prob += entry.second * (cxk.Get(entry.first) + beta) / (ck[entry.first] + beta_bar);
+                if ((cxk.Get(entry.first) + beta) / (ck[entry.first] + beta_bar) > 1) {
+                    std::cout << cxk.Get(entry.first) << ' ' << beta << ' ' << ck[entry.first] << ' ' << beta_bar << std::endl;
+                    throw std::runtime_error("what?");
+                }
             }
             prob += alpha_term;
             prob /= (L + alpha_bar);
