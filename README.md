@@ -19,7 +19,7 @@ Install third-party dependency
 	./get_gflags.sh
 
 Download some data
-	
+
 	mkdir data
 	cd data
 	wget blah
@@ -50,6 +50,12 @@ Infer latent topics of some testing data.
 	# TODO
 
 ## Data format
+
+The data format is identical to Yahoo! LDA. The input data is a text file with a number of lines, where each line is a document. The format of each line is
+
+	id1	id2 word1 word2 word3 ...
+
+id1, id2 are two string document identifiers, and each word is a string, separated by white space.
 
 ## Output format
 
