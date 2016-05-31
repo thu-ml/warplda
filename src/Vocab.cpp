@@ -21,13 +21,13 @@ void Vocab::clear()
 bool Vocab::load(std::string fname)
 {
     clear();
+    int id = 0;
     bool success = ForEachLinesInFile(fname, [&](std::string line)
     {
         std::istringstream sin(line);
-        int id;
         std::string word;
-        sin >> id >> word;
-        dict[word] = id;
+        sin >> word;
+        dict[word] = id++;
         words.push_back(word);
     });
     return success;
@@ -40,7 +40,7 @@ bool Vocab::store(std::string fname)
     std::string line;
     for (unsigned i = 0; i < words.size(); i++)
     {
-        fou << i << '\t' << words[i] << std::endl;
+        fou << words[i] << std::endl;
     }
     fou.close();
     return true;

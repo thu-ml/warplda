@@ -25,18 +25,18 @@ bool Bigraph::Load(std::string name)
 	return false;
 }
 
-void Bigraph::Generate(std::string name, std::vector<std::pair<TUID, TVID>>& edge_list)
+void Bigraph::Generate(std::string name, std::vector<std::pair<TUID, TVID>>& edge_list, TVID nv)
 {
 	TUID nu = 0;
-	TVID nv = 0;
-
 	for (auto &e : edge_list)
-	{
 		nu = std::max(nu, e.first);
-		nv = std::max(nv, e.second);
-	}
 	nu = nu + 1;
-	nv = nv + 1;
+
+    if (nv == 0) {
+	    for (auto &e : edge_list)
+		    nv = std::max(nv, e.second);
+	    nv = nv + 1;
+    }
 
 #if 0
 	std::vector<TUID> pu(nu);

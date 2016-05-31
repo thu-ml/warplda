@@ -34,11 +34,12 @@ Compile the project
 
 Format the data
 
-	./format -input ../../data/ydir_1k.txt
+	./format -input ../../data/ydir_1k.txt -prefix train
+    ./format -input ../../data/nips_test.txt -vocab_in train.vocab -test -prefix test
 
 Train the model
 
-	./warplda --k 100 --niter 300
+	./warplda --prefix train --k 100 --niter 300
 
 Check the result. Each line is a topic, its id, number of tokens assigned to it, and ten most frequent words with their probabilities.
 
@@ -46,7 +47,7 @@ Check the result. Each line is a topic, its id, number of tokens assigned to it,
 
 Infer latent topics of some testing data.
 
-	./warplda --inference -niter 40 --perplexity 10
+	./warplda --prefix test --model train.model --inference -niter 40 --perplexity 10
 
 ## Data format
 
@@ -80,7 +81,6 @@ WarpLDA generates a number of files:
 * Use custom prefix for output `-prefix myprefix`
 * Output perplexity every 10 iterations `-perplexity 10`
 * Tune Dirichlet hyperparameters `-alpha 10 -beta 0.1`
-* Get superior performance `OMP_PROC_BIND=true ./warplda [options]`
 
 ## License
 
