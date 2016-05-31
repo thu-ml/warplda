@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+import argparse, random
+
+parser = argparse.ArgumentParser(description="Convert data from UCI ML repository format to NIPS format.")
+parser.add_argument('uci', metavar='uci', type=str, help='Corpus in UCI format')
+parser.add_argument('dict', metavar='dict', type=str, help='Dictionary in UCI format')
+parser.add_argument('-o', metavar='o', type=str, help='Output corpus')
+parser.add_argument('--max_doc_length', metavar='max_doc_length', type=int, default=8192, help='Max document length, will subsample words if this is exceeded')
+
+args = parser.parse_args()
+print 'Max doc length is %d' % args.max_doc_length
+
+wlist = map(lambda x:x.rstrip(), open(args.dict, 'r').readlines())
+
+f = open(args.uci, 'r')
+try:
+	fo = open(args.o, 'w')
+except AttributeError:
+	args.output = 'yahoo_' + args.uci
+	fo = open(args.output, 'w')
+
+d = int(f.readline().rstrip())
+w = int(f.readline().rstrip())
+nnz = int(f.readline().rstrip())
+
+subsampled = 0
+def write_doc(doc_id1, doc_id2, doc):
+	global subsampled 
+	if len(doc) == 0:
+		return
+	random.shuffle(doc)
+
+	if len(doc) > args.max_doc_length:
+		subsampled += len(doc) - args.max_doc_length
+		doc = doc[:args.max_doc_length]
+
+	fo.write(str(doc_id1) + ' ' + str(doc_id2) + ' ')
+	fo.write(' '.join(doc))
+	fo.write('\n')
+
+last_docid = 1
+doc = []
+while True:
+	line = f.readline()
+	if line == '':
+		break
+
+	line = line.rstrip().split(' ')
+	docid = int(line[0])
+
+	if docid != last_docid:
+		last_docid = docid
+		write_doc(docid-1, docid-1, doc)
+		doc = []
+
+	wid = int(line[1])
+	times = int(line[2])
+	for i in xrange(times):
+		doc.append(wlist[wid-1])
+
+write_doc(last_docid, last_docid, doc)
+f.close()
+fo.close()
+
+print '%d tokens truncated' % subsampled

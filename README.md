@@ -20,7 +20,6 @@ Install third-party dependency
 
 Download some data, and split it as training and testing set
 
-	mkdir data
 	cd data
 	wget https://raw.githubusercontent.com/sudar/Yahoo_LDA/master/test/ydir_1k.txt
     head -n 900 ydir_1k.txt > ydir_train.txt
@@ -84,6 +83,14 @@ WarpLDA generates a number of files:
 * Use custom prefix for output `-prefix myprefix`
 * Output perplexity every 10 iterations `-perplexity 10`
 * Tune Dirichlet hyperparameters `-alpha 10 -beta 0.1`
+* Use UCI machine learning repository data
+
+    wget https://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/vocab.nips.txt
+    wget https://archive.ics.uci.edu/ml/machine-learning-databases/bag-of-words/docword.nips.txt.gz
+    gunzip docword.nips.txt.gz
+    ./uci-to-yahoo docword.nips.txt vocab.nips.txt -o nips.txt
+    head -n 1400 nips.txt > nips_train.txt
+    tail -n 100 nips.txt > nips_test.txt
 
 ## License
 
