@@ -18,11 +18,14 @@ Install third-party dependency
 
 	./get_gflags.sh
 
-Download some data
+Download some data, and split it as training and testing set
 
 	mkdir data
 	cd data
 	wget https://raw.githubusercontent.com/sudar/Yahoo_LDA/master/test/ydir_1k.txt
+    head -n 900 ydir_1k.txt > ydir_train.txt
+    tail -n 100 ydir_1k.txt > ydir_test.txt
+    cd ..
 
 Compile the project
 
@@ -34,8 +37,8 @@ Compile the project
 
 Format the data
 
-	./format -input ../../data/ydir_1k.txt -prefix train
-    ./format -input ../../data/nips_test.txt -vocab_in train.vocab -test -prefix test
+	./format -input ../../data/ydir_train.txt -prefix train
+    ./format -input ../../data/ydir_test.txt -vocab_in train.vocab -test -prefix test
 
 Train the model
 
@@ -43,7 +46,7 @@ Train the model
 
 Check the result. Each line is a topic, its id, number of tokens assigned to it, and ten most frequent words with their probabilities.
 
-	vim prefix.info.full.txt
+	vim train.info.full.txt
 
 Infer latent topics of some testing data.
 
