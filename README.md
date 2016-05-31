@@ -9,10 +9,11 @@ Prerequisites:
 
 	* GCC (>=4.8.5)
 	* CMake (>=2.8.12)
+    * git
 
 Clone this project
 
-	git clone https://github.com/cjf00000/warplda
+	git clone https://github.com/thu-ml/warplda
 
 Install third-party dependency
 
