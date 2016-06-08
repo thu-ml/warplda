@@ -10,6 +10,9 @@ Prerequisites:
 	* GCC (>=4.8.5)
 	* CMake (>=2.8.12)
     * git
+    * libnuma 
+      - CentOS: `yum install libnuma-devel`
+      - Ubuntu: `apt-get install libnuma-dev`
 
 Clone this project
 
