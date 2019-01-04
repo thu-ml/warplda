@@ -57,7 +57,7 @@ private:
         std::vector<TCount> ck_new;
         HashTable<TTopic, TCount> cxk_sparse;
         std::vector<TData> local_data;
-        float log_likelihood;
+        double log_likelihood;
         XorShift generator;
         uint32_t Rand32() { return generator.Rand32(); }
         LocalBuffer(TTopic K, TDegree maxdegree)
